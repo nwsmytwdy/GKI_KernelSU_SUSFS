@@ -257,6 +257,16 @@ CONFIG_KSU_SUSFS_OPEN_REDIRECT=y
                 self._chdir(ksu_dir)
                 self._run_cmd(f"git checkout {self.config.kernelsu_commit}", check=False)
                 self._chdir(self.work_dir)
+        # 钉死内核版本号为 40900，匹配官方 SukiSU Ultra 管理器（否则随 main 提交数递增会变成 40901 导致版本不匹配）
+        ksu_makefile = self.work_dir / "KernelSU" / "kernel" / "Makefile"
+        if ksu_makefile.exists():
+            with open(ksu_makefile, "r") as f:
+                mk = f.read()
+            mk_new = re.sub(r'^KSU_VERSION\s*:=.*$', 'KSU_VERSION     := 40900', mk, flags=re.MULTILINE)
+            if mk_new != mk:
+                with open(ksu_makefile, "w") as f:
+                    f.write(mk_new)
+                logger.info("已钉死 KSU_VERSION = 40900（匹配官方管理器）")
 
     def add_bbg(self):
         if not self.config.use_bbg:
@@ -493,7 +503,7 @@ CONFIG_KSU_SUSFS_OPEN_REDIRECT=y
                     f.write(content)
 
         import datetime
-        current_time = datetime.datetime.utcnow().strftime("%a %b %d %H:%M:%S UTC %Y")
+        current_time = "Sun Dec 01 08:10:00 UTC 2024"
         mkcompile_h = self.work_dir / "common/scripts/mkcompile_h"
         if mkcompile_h.exists():
             with open(mkcompile_h, "r") as f:
