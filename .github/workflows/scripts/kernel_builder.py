@@ -315,8 +315,16 @@ CONFIG_KSU_SUSFS_OPEN_REDIRECT=y
         logger.info("=== 应用 SukiSU 补丁 ===")
         self._chdir(self.work_dir / "common")
         hooks_patch = self.sukisu_patch_dir / "69_hide_stuff.patch"
-        if hooks_patch.exists():
+        # 6.6.118 上 69_hide_stuff.patch 会 fuzz 错位产生孤儿代码（task_mmu.c 的 dentry/bypass 变成 unused），
+        # 被 -Werror 判为 unused variable/label 编译失败，故跳过
+        sub = self.config.get_sub_level_int()
+        skip_hide = (self.config.android_version == "android15"
+                     and self.config.kernel_version == "6.6"
+                     and sub is not None and sub >= 118)
+        if hooks_patch.exists() and not skip_hide:
             self._run_cmd(f"cp {hooks_patch} . && patch -p1 -F 3 < 69_hide_stuff.patch", check=False)
+        elif skip_hide:
+            logger.info("跳过 69_hide_stuff.patch（android15-6.6 >= 118 fuzz 错位）")
 
     def apply_zram_patches(self):
         if not self.config.use_zram:
