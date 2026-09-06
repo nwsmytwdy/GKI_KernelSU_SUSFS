@@ -61,7 +61,7 @@ class KernelBuilder:
     KERNEL_CONFIG_TEMPLATE = """
 # === KernelSU Config ===
 CONFIG_KSU=y
-CONFIG_KPM=y
+CONFIG_KPM=n
 CONFIG_KSU_SUSFS_SUS_SU=n
 
 # === TMPFS Config ===
@@ -310,6 +310,15 @@ CONFIG_KSU_SUSFS_OPEN_REDIRECT=y
                 self._chdir(common_dir)
                 self._run_cmd(f"patch -p1 --fuzz=3 < {patch_file}", check=False)
                 self._chdir(self.work_dir)
+        # 给 SukiSU 内核补上 CONFIG_KSU_SUSFS 的 Kconfig 定义（官方漏了此 patch，
+        # 否则 CONFIG_KSU_SUSFS=y 写进 defconfig 后会被 Kconfig 静默丢弃 → 无 SUSFS）
+        ksu_enable_patch = self.susfs_dir / "kernel_patches" / "KernelSU" / "10_enable_susfs_for_ksu.patch"
+        ksu_dir = self.work_dir / "KernelSU"
+        if ksu_enable_patch.exists() and ksu_dir.exists():
+            self._run_cmd(f"cp {ksu_enable_patch} {ksu_dir}/", check=False)
+            self._chdir(ksu_dir)
+            self._run_cmd("patch -p1 --fuzz=3 < 10_enable_susfs_for_ksu.patch", check=False)
+            self._chdir(self.work_dir)
 
     def apply_sukisu_patches(self):
         logger.info("=== 应用 SukiSU 补丁 ===")
