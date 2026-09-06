@@ -272,7 +272,7 @@ CONFIG_KSU_SUSFS_OPEN_REDIRECT=y
         if ku_file.exists():
             with open(ku_file, "r") as f:
                 ku_content = f.read()
-            if "kernel_umount_feature_set" not in ku_content:
+            if "static int kernel_umount_feature_set" not in ku_content:
                 ku_content = ku_content.replace(
                     "    return 0;\n}\n\nstatic const struct ksu_feature_handler kernel_umount_handler",
                     "    return 0;\n}\n\nstatic int kernel_umount_feature_set(u64 value)\n{\n    bool enable = value != 0;\n    ksu_kernel_umount_enabled = enable;\n    pr_info(\"kernel_umount: set to %d\\n\", enable);\n    return 0;\n}\n\nstatic const struct ksu_feature_handler kernel_umount_handler",
