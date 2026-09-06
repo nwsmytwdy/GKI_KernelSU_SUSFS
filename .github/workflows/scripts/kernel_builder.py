@@ -267,6 +267,20 @@ CONFIG_KSU_SUSFS_OPEN_REDIRECT=y
                 with open(ksu_makefile, "w") as f:
                     f.write(mk_new)
                 logger.info("已钉死 KSU_VERSION = 40900（匹配官方管理器）")
+        # 修复 builtin 分支 kernel_umount.c 缺失的 kernel_umount_feature_set 函数（否则编译报 undeclared）
+        ku_file = self.work_dir / "KernelSU" / "kernel" / "feature" / "kernel_umount.c"
+        if ku_file.exists():
+            with open(ku_file, "r") as f:
+                ku_content = f.read()
+            if "kernel_umount_feature_set" not in ku_content:
+                ku_content = ku_content.replace(
+                    "    return 0;\n}\n\nstatic const struct ksu_feature_handler kernel_umount_handler",
+                    "    return 0;\n}\n\nstatic int kernel_umount_feature_set(u64 value)\n{\n    bool enable = value != 0;\n    ksu_kernel_umount_enabled = enable;\n    pr_info(\"kernel_umount: set to %d\\n\", enable);\n    return 0;\n}\n\nstatic const struct ksu_feature_handler kernel_umount_handler",
+                    1,
+                )
+                with open(ku_file, "w") as f:
+                    f.write(ku_content)
+                logger.info("已修复 kernel_umount.c 缺失的 kernel_umount_feature_set 函数")
 
     def add_bbg(self):
         if not self.config.use_bbg:
@@ -310,15 +324,6 @@ CONFIG_KSU_SUSFS_OPEN_REDIRECT=y
                 self._chdir(common_dir)
                 self._run_cmd(f"patch -p1 --fuzz=3 < {patch_file}", check=False)
                 self._chdir(self.work_dir)
-        # 给 SukiSU 内核补上 CONFIG_KSU_SUSFS 的 Kconfig 定义（官方漏了此 patch，
-        # 否则 CONFIG_KSU_SUSFS=y 写进 defconfig 后会被 Kconfig 静默丢弃 → 无 SUSFS）
-        ksu_enable_patch = self.susfs_dir / "kernel_patches" / "KernelSU" / "10_enable_susfs_for_ksu.patch"
-        ksu_dir = self.work_dir / "KernelSU"
-        if ksu_enable_patch.exists() and ksu_dir.exists():
-            self._run_cmd(f"cp {ksu_enable_patch} {ksu_dir}/", check=False)
-            self._chdir(ksu_dir)
-            self._run_cmd("patch -p1 --fuzz=3 < 10_enable_susfs_for_ksu.patch", check=False)
-            self._chdir(self.work_dir)
 
     def apply_sukisu_patches(self):
         logger.info("=== 应用 SukiSU 补丁 ===")
